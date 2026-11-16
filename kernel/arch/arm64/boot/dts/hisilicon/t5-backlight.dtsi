@@ -1,0 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-only
+&i2c4 {
+	backlight@2c {
+		compatible = "huawei,ags2-l03-lp8556";
+		reg = <0x2c>;
+	};
+};

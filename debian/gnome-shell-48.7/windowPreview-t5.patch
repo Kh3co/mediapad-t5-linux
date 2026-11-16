@@ -1,0 +1,30 @@
+--- windowPreview-48.7.js
++++ windowPreview-t5.js
+@@ -306,6 +306,8 @@
+     }
+ 
+     showOverlay(animate) {
++        if (this._destroyed || !this.window_container)
++            return;
+         if (!this._overlayEnabled)
+             return;
+ 
+@@ -337,10 +339,18 @@
+             });
+         });
+ 
++        if (this._destroyed || !this.window_container)
++            return;
+         const [width, height] = this.window_container.get_size();
+         const {scaleFactor} = St.ThemeContext.get_for_stage(global.stage);
+         const activeExtraSize = WINDOW_ACTIVE_SIZE_INC * 2 * scaleFactor;
+         const origSize = Math.max(width, height);
++        // A preview can be shown before its first nonzero allocation.
++        // Dividing by zero here sends infinite scales to the compositor.
++        if (!Number.isFinite(origSize) || origSize <= 0) {
++            this._overlayShown = false;
++            return;
++        }
+         const scale = (origSize + activeExtraSize) / origSize;
+ 
+         this.window_container.ease({

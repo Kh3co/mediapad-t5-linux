@@ -1,0 +1,150 @@
+--- dnd-48.7.js
++++ dnd-t5.js
+@@ -53,7 +53,7 @@
+         // We connect to 'event' rather than 'captured-event' because the capturing phase doesn't happen
+         // when you've grabbed the pointer.
+         eventHandlerActor.connect('event', (actor, event) => {
+-            return currentDraggable._onEvent(actor, event);
++            return currentDraggable?._onEvent(actor, event) ?? Clutter.EVENT_PROPAGATE;
+         });
+     }
+     return eventHandlerActor;
+@@ -116,9 +116,13 @@
+ 
+         this.actor.connect('destroy', () => {
+             this._actorDestroyed = true;
+-
+-            if (this._dragState === DragState.DRAGGING && this._dragCancellable)
+-                this._cancelDrag(global.get_current_time());
++            if (this._longPressLater) {
++                global.compositor.get_laters().remove(this._longPressLater);
++                delete this._longPressLater;
++            }
++
++            if (currentDraggable === this && this._dragCancellable)
++                this._abortInvalidDrag(global.get_current_time());
+             this.disconnectAll();
+         });
+         this._onEventId = null;
+@@ -148,6 +152,8 @@
+                 return true;
+ 
+             const event = Clutter.get_current_event();
++            if (!event || this._actorDestroyed || this.actor?._destroyed)
++                return true;
+             this._dragTouchSequence = event.get_event_sequence();
+ 
+             if (this._longPressLater)
+@@ -162,6 +168,8 @@
+                     delete this._actionClicked;
+                     return GLib.SOURCE_REMOVE;
+                 }
++                if (this._actorDestroyed || this.actor?._destroyed)
++                    return GLib.SOURCE_REMOVE;
+                 action.release();
+                 this.startDrag(
+                     ...action.get_coords(),
+@@ -285,7 +293,50 @@
+         return false;
+     }
+ 
++    // T5: a destroyed WindowPreview must not retain a modal input grab.
++    // Its destroy callback can run during acceptDrop/overview transitions.
++    _abortInvalidDrag(eventTime) {
++        const sourceDestroyed = this._actorDestroyed || this.actor?._destroyed;
++        // Release input first, even when stale actor cleanup cannot complete.
++        this._ungrabEvents();
++        if (this._updateHoverId) {
++            GLib.source_remove(this._updateHoverId);
++            this._updateHoverId = 0;
++        }
++        this._animationInProgress = false;
++        this._dragState = DragState.CANCELLED;
++        if (sourceDestroyed) {
++            if (this._dragActor === this.actor)
++                this._dragActor = null;
++            if (this._dragActorSource === this.actor)
++                this._dragActorSource = null;
++        }
++        try {
++            this._dragComplete();
++        } finally {
++            this._dragState = DragState.INIT;
++            if (currentDraggable === this)
++                currentDraggable = null;
++            global.display.set_cursor(Meta.Cursor.DEFAULT);
++        }
++        // Do not notify WindowPreview callbacks after it has been disposed.
++        if (!sourceDestroyed) {
++            this.emit('drag-cancelled', eventTime);
++            this.emit('drag-end', eventTime, false);
++        }
++        console.log('T5 DND: released invalid drag input grab');
++    }
++
++    _dragIsInvalid() {
++        return this._actorDestroyed || this.actor?._destroyed ||
++            !this._dragActor || !this._dragActor.get_stage();
++    }
++
+     _onEvent(actor, event) {
++        if (this._dragState === DragState.DRAGGING && this._dragIsInvalid()) {
++            this._abortInvalidDrag(event.get_time());
++            return Clutter.EVENT_STOP;
++        }
+         let device = event.get_device();
+ 
+         if (this._grabbedDevice &&
+@@ -355,6 +406,8 @@
+      * @param {Clutter.InputDevice=} device - device that originated the event
+      */
+     startDrag(stageX, stageY, time, sequence, device) {
++        if (this._actorDestroyed || this.actor?._destroyed || !this.actor.get_stage())
++            return;
+         if (currentDraggable)
+             return;
+ 
+@@ -475,8 +528,8 @@
+             this._finishAnimation();
+ 
+             this._dragActor = null;
+-            if (this._dragState === DragState.DRAGGING)
+-                this._dragState = DragState.CANCELLED;
++            if (currentDraggable === this && this._dragCancellable)
++                this._abortInvalidDrag(global.get_current_time());
+         });
+         this._dragOrigOpacity = this._dragActor.opacity;
+         if (this._dragActorOpacity !== undefined)
+@@ -575,6 +628,10 @@
+ 
+     _updateDragHover() {
+         this._updateHoverId = 0;
++        if (this._dragIsInvalid()) {
++            this._abortInvalidDrag(global.get_current_time());
++            return GLib.SOURCE_REMOVE;
++        }
+         let target = this._pickTargetActor();
+ 
+         let dragEvent = {
+@@ -642,6 +699,10 @@
+     }
+ 
+     _updateDragPosition(event) {
++        if (this._dragIsInvalid()) {
++            this._abortInvalidDrag(event.get_time());
++            return true;
++        }
+         let [stageX, stageY] = event.get_coords();
+         this._dragX = stageX;
+         this._dragY = stageY;
+@@ -654,6 +715,10 @@
+     }
+ 
+     _dragActorDropped(event) {
++        if (this._dragIsInvalid()) {
++            this._abortInvalidDrag(event.get_time());
++            return true;
++        }
+         let [dropX, dropY] = event.get_coords();
+         let target = this._dragActor.get_stage().get_actor_at_pos(
+             Clutter.PickMode.ALL, dropX, dropY);

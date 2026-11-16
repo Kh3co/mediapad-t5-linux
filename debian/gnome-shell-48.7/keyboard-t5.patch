@@ -1,0 +1,49 @@
+--- keyboard-48.7.js
++++ keyboard-t5.js
+@@ -629,8 +629,8 @@
+         this.connect('destroy', () => this._onDestroy());
+ 
+         this.bind_property(
+-            'visible', this._swipeTracker, 'enabled',
+-            GObject.BindingFlags.DEFAULT);
++            'mapped', this._swipeTracker, 'enabled',
++            GObject.BindingFlags.SYNC_CREATE);
+     }
+ 
+     _onDestroy() {
+@@ -645,6 +645,9 @@
+     }
+ 
+     set delta(value) {
++        // Hidden/uninitialized emoji pages must not process swipe updates.
++        if (!this._panel)
++            return;
+         if (this._delta === value)
+             return;
+ 
+@@ -700,6 +703,8 @@
+     }
+ 
+     _onSwipeUpdate(tracker, progress) {
++        if (!this.mapped || !this._panel || this.width <= 0 || this._pages.length === 0)
++            return;
+         this.delta = -progress * this._width;
+ 
+         if (this._currentKey != null) {
+@@ -711,12 +716,16 @@
+     }
+ 
+     _onSwipeBegin(tracker) {
++        if (!this.mapped || !this._panel || this.width <= 0 || this._pages.length === 0)
++            return;
+         this._width = this.width;
+         const points = [-1, 0, 1];
+         tracker.confirmSwipe(this._width, points, 0, 0);
+     }
+ 
+     _onSwipeEnd(tracker, duration, endProgress) {
++        if (!this.mapped || !this._panel || this.width <= 0 || this._pages.length === 0)
++            return;
+         this.remove_all_transitions();
+         if (endProgress === 0) {
+             this.ease_property('delta', 0, {duration});

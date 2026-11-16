@@ -1,0 +1,1 @@
+SUBSYSTEM=="power_supply", KERNEL=="t5-battery", ENV{UPOWER_USE_CHARGER_STATUS}="1"

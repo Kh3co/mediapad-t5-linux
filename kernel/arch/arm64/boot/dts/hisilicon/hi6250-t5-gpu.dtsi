@@ -1,0 +1,32 @@
+/* AGS2-L03 GPU integration; parameters checked against this device's DT. */
+/ {
+    t5_gpu_supply: regulator-gpu {
+        compatible = "huawei,ags2l03-g3d-regulator";
+        regulator-name = "g3d";
+        mboxes = <&mailbox 14 3 1>;
+        clocks = <&stub_clock HI6250_CLK_STUB_GPU>;
+    };
+};
+&mailbox {
+    hisilicon,manual-ack-channels = <14>;
+};
+&mali {
+    compatible = "huawei,ags2l03-mali-t830", "arm,mali-t830";
+    status = "okay";
+    interrupt-names = "job", "mmu", "gpu";
+    clock-names = "core";
+    mali-supply = <&t5_gpu_supply>;
+};
+
+/* Original firmware900MHz rail profile; dedicated PLL adds1146MHz. */
+/ {
+    t5_gpu_opp_table: gpu-opp-table {
+        compatible = "operating-points-v2";
+        opp-120000000 { opp-hz = /bits/ 64 <120000000>; };
+        opp-1146000000 { opp-hz = /bits/ 64 <1146000000>; };
+    };
+};
+&mali {
+    operating-points-v2 = <&t5_gpu_opp_table>;
+    #cooling-cells = <2>;
+};

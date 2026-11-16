@@ -1,0 +1,14 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
+&sdhci0 {
+ compatible = "huawei,ags2l03-emmc-readonly";
+ status = "okay";
+ bus-width = <8>;
+ max-frequency = <200000000>;
+ cap-mmc-highspeed;
+ mmc-hs200-1_8v;
+ mmc-hs400-1_8v;
+ fixed-emmc-driver-type = <4>;
+ /delete-property/ no-1-8-v;
+ no-sd;
+ no-sdio;
+};

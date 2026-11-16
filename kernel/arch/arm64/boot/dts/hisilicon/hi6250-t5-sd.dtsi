@@ -1,0 +1,27 @@
+&pmx0 {
+ t5_sd_mux: t5-sd-mux {
+  pinctrl-single,pins = <0x98 1 0x9c 1 0xa0 1 0xa4 1 0xa8 1 0xac 1>;
+ };
+};
+&dwmmc1 {
+ compatible = "huawei,ags2l03-sd-validation";
+ status = "okay";
+ clock-names = "ciu", "biu";
+ pinctrl-names = "default";
+ pinctrl-0 = <&t5_sd_mux>;
+ /delete-property/ vmmc-supply;
+ /delete-property/ vqmmc-supply;
+ /delete-property/ hisilicon,peripheral-syscon;
+ /delete-property/ cd-vol;
+ /delete-property/ cd-gpio;
+ bus-width = <4>;
+ max-frequency = <25000000>;
+ voltage-ranges = <3000 3000>;
+ no-1-8-v;
+ disable-wp;
+ no-mmc;
+ no-sdio;
+ /* Initial validation requires the inserted card; hotplug added later. */
+ non-removable;
+ fifo-depth = <256>;
+};

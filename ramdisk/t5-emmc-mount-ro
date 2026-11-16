@@ -1,0 +1,56 @@
+#!/bin/sh
+# Mount only bounded ext4 filesystems on the internal guarded eMMC.
+set -eu
+out=/run/t5-emmc
+mkdir -p "$out" /mnt/emmc-ro
+: > "$out/mount-report.tsv"
+emmc=
+for path in /sys/class/block/mmcblk[0-9]; do
+ [ -d "$path" ] || continue
+ [ "$(cat "$path/device/type")" = MMC ] || continue
+ real=$(readlink -f "$path/device")
+ case "$real" in */ff390000.sdhci/*) ;; *) continue;; esac
+ [ -z "$emmc" ] || { echo EMMC_MULTIPLE_INTERNAL_DEVICES; exit 2; }
+ emmc=${path##*/}
+done
+[ -n "$emmc" ] || { echo EMMC_NOT_DETECTED; exit 2; }
+[ "$(cat /sys/class/block/$emmc/ro)" = 1 ]
+grep -q '^policy=immutable-readonly$' /sys/bus/platform/devices/ff390000.sdhci/readonly_status
+/opt/t5-ext4-probe --guard /dev/$emmc
+mounted=0
+skipped=0
+errors=0
+for path in /sys/class/block/${emmc}p*; do
+ [ -r "$path/partition" ] || continue
+ part=${path##*/}
+ [ "$(cat "$path/ro")" = 1 ]
+ name=$(sed -n 's/^PARTNAME=//p' "$path/uevent" | tr -cd 'A-Za-z0-9._-')
+ [ -n "$name" ] || name=unnamed
+ node=/dev/$part
+ if info=$(/opt/t5-ext4-probe "$node"); then
+  mp=/mnt/emmc-ro/$part-$name
+  mkdir -p "$mp"
+  if mount -t ext4 -o ro,noload,nodev,nosuid,noexec "$node" "$mp"; then
+   printf 'MOUNTED\t%s\t%s\t%s\n' "$node" "$mp" "$info" >> "$out/mount-report.tsv"
+   mounted=$((mounted+1))
+  else
+   printf 'MOUNT_FAILED\t%s\t%s\n' "$node" "$info" >> "$out/mount-report.tsv"
+   errors=$((errors+1))
+  fi
+ else
+  rc=$?
+  if [ "$rc" = 1 ]; then
+   continue
+  elif [ "$rc" = 2 ]; then
+   printf 'SKIPPED_INVALID_EXT4\t%s\t%s\n' "$node" "$info" >> "$out/mount-report.tsv"
+   skipped=$((skipped+1))
+  else
+   printf 'PROBE_FAILED\t%s\t%s\n' "$node" "$rc" >> "$out/mount-report.tsv"
+   errors=$((errors+1))
+  fi
+ fi
+done
+cat "$out/mount-report.tsv"
+echo "EMMC_RO_MOUNTS mounted=$mounted skipped_invalid=$skipped errors=$errors"
+[ "$errors" = 0 ]
+# RAM root remains active. No root marker is created or switch_root attempted.

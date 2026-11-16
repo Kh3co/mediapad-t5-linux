@@ -1,0 +1,72 @@
+/* Experimental AGS2-L03 CPU/thermal wiring. Assisted-by: LLM. */
+&cpu0 { clocks = <&stub_clock HI6250_CLK_STUB_CLUSTER0>; #cooling-cells = <2>; };
+&cpu1 { clocks = <&stub_clock HI6250_CLK_STUB_CLUSTER0>; };
+&cpu2 { clocks = <&stub_clock HI6250_CLK_STUB_CLUSTER0>; };
+&cpu3 { clocks = <&stub_clock HI6250_CLK_STUB_CLUSTER0>; };
+&cpu4 { clocks = <&stub_clock HI6250_CLK_STUB_CLUSTER1>; #cooling-cells = <2>; };
+&cpu5 { clocks = <&stub_clock HI6250_CLK_STUB_CLUSTER1>; };
+&cpu6 { clocks = <&stub_clock HI6250_CLK_STUB_CLUSTER1>; };
+&cpu7 { clocks = <&stub_clock HI6250_CLK_STUB_CLUSTER1>; };
+
+/* Only the requested two endpoints are exposed. LPM3 performs DVFS. */
+&cpu_opp_table_0 {
+    /delete-node/ opp1;
+    /delete-node/ opp2;
+    opp0 { /delete-property/ opp-supported-hw; };
+    opp3 { /delete-property/ opp-supported-hw; };
+};
+&cpu_opp_table_1 {
+    /delete-node/ opp1;
+    /delete-node/ opp2;
+    /delete-node/ opp3;
+    opp0 { /delete-property/ opp-supported-hw; };
+    opp4 { /delete-property/ opp-supported-hw; };
+};
+
+/ {
+    t5_tsens: temperature-sensor {
+        compatible = "huawei,ags2l03-secure-tsens";
+        #thermal-sensor-cells = <1>;
+    };
+    thermal-zones {
+        t5-cluster0 {
+            polling-delay = <100>;
+            polling-delay-passive = <100>;
+            thermal-sensors = <&t5_tsens 0>;
+            trips {
+                t5_hot0: hot { temperature = <90000>; hysteresis = <4999>; type = "active"; };
+            };
+            cooling-maps {
+                little { trip = <&t5_hot0>; cooling-device = <&cpu0 1 1>; };
+                big { trip = <&t5_hot0>; cooling-device = <&cpu4 1 1>; };
+                gpu { trip = <&t5_hot0>; cooling-device = <&mali 1 1>; };
+            };
+        };
+        t5-cluster1 {
+            polling-delay = <100>;
+            polling-delay-passive = <100>;
+            thermal-sensors = <&t5_tsens 1>;
+            trips {
+                t5_hot1: hot { temperature = <90000>; hysteresis = <4999>; type = "active"; };
+            };
+            cooling-maps {
+                little { trip = <&t5_hot1>; cooling-device = <&cpu0 1 1>; };
+                big { trip = <&t5_hot1>; cooling-device = <&cpu4 1 1>; };
+                gpu { trip = <&t5_hot1>; cooling-device = <&mali 1 1>; };
+            };
+        };
+        t5-gpu {
+            polling-delay = <100>;
+            polling-delay-passive = <100>;
+            thermal-sensors = <&t5_tsens 2>;
+            trips {
+                t5_hot2: hot { temperature = <90000>; hysteresis = <4999>; type = "active"; };
+            };
+            cooling-maps {
+                little { trip = <&t5_hot2>; cooling-device = <&cpu0 1 1>; };
+                big { trip = <&t5_hot2>; cooling-device = <&cpu4 1 1>; };
+                gpu { trip = <&t5_hot2>; cooling-device = <&mali 1 1>; };
+            };
+        };
+    };
+};

@@ -1,0 +1,12 @@
+<schemalist>
+  <schema id="org.gnome.shell.extensions.t5-sleep-mode" path="/org/gnome/shell/extensions/t5-sleep-mode/">
+    <key name="mode" type="s">
+      <choices>
+        <choice value="screen-off"/>
+        <choice value="suspend"/>
+      </choices>
+      <default>'screen-off'</default>
+      <summary>Short power button action when the display is on</summary>
+    </key>
+  </schema>
+</schemalist>

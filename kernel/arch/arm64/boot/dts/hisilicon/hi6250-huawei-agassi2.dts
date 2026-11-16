@@ -1,0 +1,176 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/* Experimental RAM-only board: AGS2-L03, 2 GiB. Assisted-by: Codex. */
+/dts-v1/;
+#include "hi6250.dtsi"
+#include <dt-bindings/gpio/gpio.h>
+/ {
+    model = "Huawei MediaPad T5 AGS2-L03 Linux validation v118 audio and poweroff";
+    compatible = "huawei,agassi2", "hisilicon,hi6250";
+    chassis-type = "tablet";
+    memory@400000 {
+        device_type = "memory";
+        reg = <0 0x00400000 0 0x3fc00000>, <0 0x40000000 0 0x40000000>;
+    };
+    chosen {
+        bootargs = "console=tty0 console=ttyGS0,115200 loglevel=8 ignore_loglevel keep_bootcon printk.time=1 log_buf_len=1M clk_ignore_unused pd_ignore_unused nokaslr cpuidle.off=1 maxcpus=8 fbcon=rotate:1 cma=96M systemd.gpt_auto=no systemd.swap=no systemd.show_status=0 systemd.log_target=kmsg panic=0 rdinit=/init";
+        #address-cells = <2>; #size-cells = <2>; ranges;
+        stdout-path = "framebuffer0";
+        framebuffer0: framebuffer@5d000000 {
+            huawei,t5-clockwise-scanout;
+            compatible = "simple-framebuffer";
+            reg = <0 0x5d000000 0 0x8ca000>;
+            width = <1200>; height = <1920>; stride = <4800>;
+            format = "a8r8g8b8"; status = "okay";
+        };
+    };
+    reserved-memory {
+        #address-cells = <2>; #size-cells = <2>; ranges;
+        /* v105 RAM-only reclaim experiment; active secure/firmware ranges retained. */
+        modem_retained@38000000 { reg = <0 0x38000000 0 0x7100000>; };
+        retained0@7b00000 { reg = <0 0x7b00000 0 0x8000>; no-map; };
+        retained1@e000000 { reg = <0 0xe000000 0 0x1000>; no-map; };
+        retained2@34000000 { reg = <0 0x34000000 0 0x800000>; no-map; };
+        retained3@34900000 { reg = <0 0x34900000 0 0x220000>; no-map; };
+        retained4@34f00000 { reg = <0 0x34f00000 0 0xfc0000>; no-map; };
+        retained5@36000000 { reg = <0 0x36000000 0 0x2000000>; no-map; };
+        retained6@47b00000 { reg = <0 0x47b00000 0 0x8000>; no-map; };
+
+        framebuffer_reserved: framebuffer@5d000000 {
+            reg = <0 0x5d000000 0 0x00c00000>; no-map;
+        };
+        framebuffer_tail@5dc00000 { reg = <0 0x5dc00000 0 0x02400000>; };
+        ramoops@34800000 {
+            compatible = "ramoops";
+            reg = <0 0x34800000 0 0x100000>;
+            record-size = <0x20000>; console-size = <0x80000>;
+            pmsg-size = <0x20000>; ftrace-size = <0>;
+        };
+    };
+};
+&usb_otg {
+    status = "okay";
+    hisilicon,eye-diagram-param = <0x059066db>;
+};
+/* Storage controllers stay disabled; MMC support is also omitted in Kconfig. */
+
+/ { psci {
+        compatible = "arm,psci";
+        method = "smc";
+        cpu_suspend = <0xc4000001>;
+        cpu_off = <0x84000002>;
+        cpu_on = <0xc4000003>;
+    /delete-property/ system_off;
+    /delete-property/ system_reset;
+}; };
+
+&usb_dwc2 {
+    g-rx-fifo-size = <512>;
+    g-np-tx-fifo-size = <128>;
+    g-tx-fifo-size = <128 128 128 128 128 128 16 16 16 16 16 16 16 16 16>;
+};
+
+#include "hi6250-t5-cpu.dtsi"
+
+#include "hi6250-t5-gpu.dtsi"
+
+#include "hi6250-t5-battery.dtsi"
+
+#include "hi6250-t5-sd.dtsi"
+
+#include "hi6250-t5-touch.dtsi"
+
+#include "hi6250-t5-emmc.dtsi"
+
+&{/soc} {
+ t5_dss: display@e8600000 {
+  compatible = "huawei,ags2l03-dss";
+  reg = <0 0xe8600000 0 0x80000>;
+  interrupts = <GIC_SPI 245 IRQ_TYPE_LEVEL_HIGH>;
+  status = "okay";
+ };
+};
+
+/ { tee-probe { compatible = "huawei,ags2l03-tee-probe"; }; };
+
+&cpu_opp_table_0 { /delete-node/ opp1; /delete-node/ opp2; opp3 { opp-hz = /bits/ 64 <1709000000>; }; };
+
+/* Daily CPU endpoints, firmware rail first, then bounded PLL feedback. */
+&cpu_opp_table_0 { opp3 { opp-hz = /bits/ 64 <1900000000>; }; };
+&cpu_opp_table_1 { opp4 { opp-hz = /bits/ 64 <2570000000>; }; };
+
+&gpio4 { status = "okay"; };
+&gpio11 { status = "okay"; };
+&pmx0 {
+ wifi_mux74: wifi-enum-mux { pinctrl-single,pins = <0xe8 1 0xec 1 0xf0 1 0xf4 1 0xf8 1 0xfc 1 0x160 0>; };
+};
+&dwmmc2 {
+ compatible = "huawei,ags2l03-sdio-enum";
+ status = "okay";
+ clocks = <&crg_ctrl HI6250_CLK_SDIO0>, <&crg_ctrl HI6250_HCLK_SDIO0>, <&pmu_ctrl HI6250_CLK_PMU32KB>;
+ clock-names = "ciu", "biu", "wifi-ref";
+ pinctrl-names = "default"; pinctrl-0 = <&wifi_mux74>;
+ wifi-enable-gpios = <&gpio4 3 0>; xldo-gpios = <&gpio11 3 0>;
+ bus-width = <4>; fifo-depth = <256>; non-removable; no-mmc; no-sd;
+ max-frequency = <25000000>; cap-sdio-irq; voltage-ranges = <1650 1950>;
+};
+
+/ {
+    hw_connectivity { compatible = "huawei,hw_connectivity"; chip_type = "hisi"; };
+    hi1102 {
+        compatible = "hisilicon,hi1102";
+        clocks = <&pmu_ctrl HI6250_CLK_PMU32KB>;
+        clock-names = "clk_pmu32kb";
+        huawei,pmu_clk32b = "pmu_clk32kb";
+        hi1102,gpio_power_on = <&gpio4 3 0>;
+        hi1102,gpio_xldo_pinmux = <&gpio11 3 0>;
+        hi1102,asic_version; hi1102,power_prepare;
+        xldo_gpio_level = <1>;
+        pinctrl-names = "default", "idle";
+        pinctrl-0 = <&radio_default76>; pinctrl-1 = <&radio_idle76>;
+    };
+    hi1102_custom { compatible = "hi1102,customize"; ini_file_name = "/vendor/etc/cfg_ags2_l03_hisi.ini"; };
+    hisi_wifi { compatible = "hisilicon,hisi_wifi"; hi1102,gpio_wlan_wakeup_host = <&gpio26 5 0>; };
+    hisi_bfgx { compatible = "hisilicon,hisi_bfgx"; hi1102,gpio_bfgn_wakeup_host = <&gpio26 2 0>; hi1102,uart_port = "/dev/ttyAMA3"; };
+};
+&gpio26 { status = "okay"; };
+&pmx0 {
+    radio_default76: radio-default { pinctrl-single,pins = <0x15c 1 0x160 1 0x164 1>; };
+    radio_idle76: radio-idle { pinctrl-single,pins = <0x15c 0 0x160 0 0x164 0>; };
+    sdio_bus76: sdio-bus { pinctrl-single,pins = <0xe8 1 0xec 1 0xf0 1 0xf4 1 0xf8 1 0xfc 1>; };
+};
+&dwmmc2 { pinctrl-0 = <&sdio_bus76>; };
+
+/ { aliases { serial3 = &uart3; }; };
+&pmx0 {
+ t5_bt_uart_mux: bt-uart3-mux { pinctrl-single,pins = <0x110 1 0x114 1 0x118 1 0x11c 1>; };
+};
+&uart3 {
+ status = "okay"; pinctrl-names = "default"; pinctrl-0 = <&t5_bt_uart_mux>;
+ /delete-property/ dmas; /delete-property/ dma-names;
+};
+
+/ { hifi-test { compatible = "huawei,t5-hifi-ram-test"; mboxes = <&mailbox 18 4 1>; interrupt-parent = <&gic>; interrupts = <0 199 4>; speaker-gpios = <&gpio9 6 0>, <&gpio9 7 0>; clocks = <&crg_ctrl HI6250_CLK_MODEM2CODEC0>, <&sys_ctrl HI6250_CLK_ASPCODEC>; clock-names = "modem", "codec"; }; };
+
+&gpio9 { status = "okay"; };
+/* AGS2-L03 sys_peri uses the existing exclusive LPM3 channel 14. */
+&t5_gpu_supply {
+	t5_hifi_sys_peri: sys-peri {
+		regulator-name = "sys_peri";
+	};
+};
+
+&{/hifi-test} {
+	sys-peri-supply = <&t5_hifi_sys_peri>;
+};
+
+#include "hi6250-t5-sleep-power.dtsi"
+
+#include "t5-backlight.dtsi"
+
+&dwmmc2 { keep-power-in-suspend; };
+
+#include "hi6250-t5-volume.dtsi"
+
+&hi6250_reboot {
+    powerhold-gpios = <&gpio25 4 GPIO_ACTIVE_LOW>;
+};

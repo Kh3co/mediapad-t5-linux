@@ -1,0 +1,11 @@
+/* AP RTC from AGS2-L03 stock entry 49. No PMIC access. */
+/ {
+	t5_alarm: rtc@fff04000 {
+		compatible = "huawei,ags2-l03-soc-rtc-alarm";
+		reg = <0x0 0xfff04000 0x0 0x1000>;
+		interrupt-parent = <&gic>;
+		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&sys_ctrl HI6250_PCLK_RTC>;
+		wakeup-source;
+	};
+};

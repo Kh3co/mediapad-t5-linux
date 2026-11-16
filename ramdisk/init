@@ -1,0 +1,165 @@
+#!/bin/sh
+/bin/busybox --install -s /bin
+export PATH=/bin
+mount -t devtmpfs devtmpfs /dev
+mkdir -p /proc /sys /tmp /run /dev/pts
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t tmpfs tmpfs /tmp
+mount -t tmpfs tmpfs /run
+mount -t devpts devpts /dev/pts
+# Keep PID1 and the supervisor on the framebuffer terminal.  /dev/console
+# selects ttyGS0 here and makes its console files participate in TTY hangup
+# close accounting alongside the independent interactive serial files.
+exec </dev/tty0 >/dev/tty0 2>&1
+echo
+echo "T5 AGS2-L03 v108: /init reached; verified memory reclaim then Debian"
+uname -a
+echo "Manual SD-only validation is available; Content-based Debian root discovery; only the unique verified root may receive a bounded write window."
+cat /proc/meminfo | head -5
+echo "USB ACM serial should appear on the host; kernel console: ttyGS0."
+echo "Framebuffer console: tty0, BOE FT8201 1200x1920."
+mkdir -p /sys/fs/pstore
+mount -t pstore pstore /sys/fs/pstore 2>/dev/null
+echo 8 > /proc/sys/kernel/printk
+# Both policies start in powersave. Enable binary policy only after registration.
+(
+    for n in $(seq 1 30); do
+        if [ -f /sys/devices/system/cpu/cpufreq/policy0/scaling_governor ] && [ -f /sys/devices/system/cpu/cpufreq/policy4/scaling_governor ]; then
+            echo t5_binary > /sys/devices/system/cpu/cpufreq/policy0/scaling_governor
+            echo t5_binary > /sys/devices/system/cpu/cpufreq/policy4/scaling_governor
+            echo 'T5 binary policy enabled: idle=min, load=max, 90C=min, recover at or below 85C' > /dev/kmsg
+            break
+        fi
+        sleep 1
+    done
+) &
+# FT8201 uses the bootloader's established incell display power/reset state.
+# Enable after userspace/serial is up; no firmware update or panel reset.
+(
+    sleep 2
+    echo Y > /sys/module/edt_ft5x06/parameters/t5_allow_probe
+    for path in /sys/bus/i2c/devices/*-0038; do
+        if [ -r "$path/of_node/compatible" ] && grep -q 'focaltech,ft8201' "$path/of_node/compatible"; then
+            if [ ! -L "$path/driver" ]; then
+                echo "${path##*/}" > /sys/bus/i2c/drivers/edt_ft5x06/bind
+            fi
+            echo 'T5 FT8201 ten-slot multitouch enabled; landscape 1920x1200' > /dev/kmsg
+        fi
+    done
+) &
+# Start telemetry after the USB diagnostic shell is available. This only
+# binds the read-only observer; no charging-control service is started.
+(
+    sleep 3
+    for n in $(seq 1 20); do
+        for path in /sys/bus/i2c/devices/*-006b; do
+            if [ -f "$path/of_node/compatible" ] && grep -q 'huawei,ags2l03-battery-telemetry' "$path/of_node/compatible"; then
+                echo Y > /sys/module/hi6250_t5_battery/parameters/disable_modem
+                echo Y > /sys/module/hi6250_t5_battery/parameters/allow_probe
+                echo "${path##*/}" > /sys/bus/i2c/drivers/hi6250-t5-battery/bind
+                exit
+            fi
+        done
+        sleep 1
+    done
+) &
+
+
+# Every newly released page remains reserved at kernel entry. Any failure
+# stops in the RAM shell before root discovery or the writable-root window.
+reclaim_memory() (
+    set -eu
+    p=/sys/devices/platform/tee-probe
+    echo T5_AUTO_RECLAIM_BEGIN
+    head -4 /proc/meminfo
+    # This is a firmware prerequisite, not a root-filesystem selector.
+    [ "$(cat /sys/class/block/mmcblk0/device/cid)" = @T5_EMMC_CID@ ]
+    [ "$(sha256sum /dev/mmcblk0p34 | cut -d ' ' -f 1)" = @T5_DTS_SHA256@ ]
+    echo WIFI_ONLY_DTS_VERIFIED
+    ready=0
+    for n in $(seq 1 30); do
+        if [ -r /sys/bus/i2c/devices/1-006b/modem_reclaim_state ]; then ready=1; break; fi
+        sleep 1
+    done
+    [ "$ready" = 1 ]
+    cat /sys/bus/i2c/devices/1-006b/modem_reclaim_state
+    # Native LPM3's -5 reply in Wi-Fi mode is NOT interpreted as shutdown
+    # success. Only authenticated secboot resetACK0 authorizes the tests.
+    echo WAITING_FOR_RANDOM_READY
+    timeout 60 dd if=/dev/random of=/dev/null bs=32 count=1
+    echo 1 >"$p/tee_connect"
+    echo 1 >"$p/tee_query"
+    echo 1 >"$p/tee_session"
+    echo 1 >"$p/tee_reset"
+    grep -q '^reset_verified=1$' "$p/tee_auth_state"
+    echo MODEM-SECURE-RESET-ACK0-RESERVED-113M >"$p/ram_test_arm"
+    echo 1 >"$p/modem_page_test"
+    grep -q '^page_test_ret=0$' "$p/tee_auth_state"
+    echo 1 >"$p/modem_range_test"
+    grep -q '^range_runs=1$' "$p/ram_range_state"
+    grep -q '^range_bad_pages=0$' "$p/ram_range_state"
+    grep -q '^restore_bad_pages=0$' "$p/ram_range_state"
+    echo 1 >"$p/tee_close"
+    grep -q '^session_open=0$' "$p/tee_auth_state"
+    echo WIFI-DTS-RESET-TESTED-113M >"$p/ram_release"
+    grep -q '^freed_pages=28928$' "$p/ram_range_state"
+    echo TEST-RESERVED-FB-TAIL36M >"$p/fb_tail_test"
+    grep -q '^tested=1$' "$p/fb_tail_state"
+    grep -q '^bad_pages=0$' "$p/fb_tail_state"
+    grep -q '^restore_bad_pages=0$' "$p/fb_tail_state"
+    echo RELEASE-TESTED-FB-TAIL36M >"$p/fb_tail_release"
+    grep -q '^freed_pages=9216$' "$p/fb_tail_state"
+    cat "$p/tee_auth_state" "$p/ram_range_state" "$p/fb_tail_state"
+    head -8 /proc/meminfo
+    echo T5_AUTO_RECLAIM_SUCCESS_MODEM113_FB36_KEEP12_SECUREOS30_RETAINED
+)
+
+fallback() {
+    echo "T5 Debian boot stopped: $*; RAM-only recovery shell" > /dev/kmsg
+    while [ ! -c /dev/ttyGS0 ]; do sleep 1; done
+    stty -F /dev/ttyGS0 115200 raw -echo 2>/dev/null
+    while true; do
+        echo "T5 RAM recovery shell; root boot failed, inspect /run/t5-root" > /dev/ttyGS0
+        setsid sh -c 'exec sh -i <>/dev/ttyGS0 >&0 2>&1'
+        sleep 2
+    done
+}
+sleep 4
+dev=/sys/bus/platform/devices/ff390000.sdhci
+echo Y > /sys/module/sdhci_t5/parameters/allow_probe || fallback gate
+echo ff390000.sdhci > /sys/bus/platform/drivers/t5-emmc-readonly/bind || fallback bind
+ready=0
+for n in $(seq 1 40); do
+    if [ -b /dev/mmcblk0boot1 ] && [ -r /sys/class/block/mmcblk0/ro ]; then
+        ready=1; break
+    fi
+    sleep 1
+done
+[ "$ready" = 1 ] || fallback discovery-timeout
+echo 1 > "$dev/guard_selftest" || fallback native-guard
+echo "T5 validating and reclaiming modem113MiB + framebuffer36MiB" > /dev/kmsg
+if reclaim_memory > /run/t5-memory-reclaim.log 2>&1; then
+    echo "T5 automatic memory reclaim passed: modem113MiB + framebuffer36MiB" > /dev/kmsg
+else
+    tail -25 /run/t5-memory-reclaim.log
+    fallback memory-reclaim
+fi
+/opt/t5-discover-root > /run/t5-discovery.log 2>&1 || fallback root-identity
+node=$(cat /run/t5-root/device)
+/opt/t5-root-control arm "$node" > /run/t5-root/window.log 2>&1 || fallback root-window
+mkdir -p /newroot
+mount -t ext4 -o rw,noatime "$node" /newroot || fallback root-mount
+grep -q "^$node /newroot ext4 rw," /proc/mounts || fallback root-mounted-readonly
+/opt/t5-root-control identity /newroot || fallback root-recheck
+ln -s "$node" /dev/root
+mkdir -p /newroot/dev /newroot/proc /newroot/sys /newroot/run
+dmesg > /run/t5-root/early-dmesg.log
+cp /run/t5-discovery.log /run/t5-root/
+echo "T5 switching to content-verified Debian ARM64 root $node" > /dev/kmsg
+# No diagnostic shell is started before handoff. Systemd owns serial getty.
+mount --move /dev /newroot/dev || fallback move-dev
+mount --move /proc /newroot/proc || fallback move-proc
+mount --move /sys /newroot/sys || fallback move-sys
+mount --move /run /newroot/run || fallback move-run
+exec switch_root -c /dev/tty0 /newroot /sbin/init

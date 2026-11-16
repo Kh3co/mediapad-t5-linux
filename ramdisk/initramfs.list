@@ -1,0 +1,41 @@
+dir /dev 0755 0 0
+nod /dev/console 0600 0 0 c 5 1
+nod /dev/null 0666 0 0 c 1 3
+dir /bin 0755 0 0
+dir /proc 0755 0 0
+dir /sys 0755 0 0
+dir /tmp 1777 0 0
+dir /run 0755 0 0
+file /bin/busybox @INPUTS@/busybox.aarch64 0755 0 0
+slink /bin/sh busybox 0777 0 0
+file /init @REPO@/build/ramdisk/init 0755 0 0
+dir /opt 0755 0 0
+
+file /opt/t5-touch-test @REPO@/build/ramdisk/t5-touch-test 0755 0 0
+
+file /opt/t5-ext4-probe @REPO@/build/ramdisk/t5-ext4-probe 0755 0 0
+file /opt/t5-emmc-mount-ro @REPO@/ramdisk/t5-emmc-mount-ro 0755 0 0
+
+file /opt/t5-root-control @REPO@/build/ramdisk/t5-root-control 0755 0 0
+file /opt/t5-discover-root @REPO@/ramdisk/t5-discover-root 0755 0 0
+
+file /opt/t5-emmc-readbench @REPO@/build/ramdisk/t5-emmc-readbench 0755 0 0
+
+dir /lib 0755 0 0
+dir /lib/firmware 0755 0 0
+dir /lib/firmware/t5 0755 0 0
+file /lib/firmware/t5/cr4_asic.bin @INPUTS@/cr4_asic.bin 0644 0 0
+
+dir /vendor 0755 0 0
+dir /vendor/etc 0755 0 0
+dir /vendor/firmware 0755 0 0
+file /vendor/etc/cfg_ags2_l03_hisi.ini @INPUTS@/wifi76/cfg_ags2_l03_hisi.ini 0644 0 0
+file /vendor/firmware/bfgx_and_wifi_cfg @INPUTS@/wifi76/bfgx_and_wifi_cfg 0644 0 0
+file /vendor/firmware/cr4_asic.bin @INPUTS@/wifi76/cr4_asic.bin 0644 0 0
+file /vendor/firmware/CPU_RAM_SCHED.bin @INPUTS@/wifi76/CPU_RAM_SCHED.bin 0644 0 0
+file /vendor/firmware/CPU_RAM_WBS.bin @INPUTS@/wifi76/CPU_RAM_WBS.bin 0644 0 0
+file /vendor/firmware/bfgx_cfg @INPUTS@/wifi76/bfgx_cfg 0644 0 0
+file /vendor/firmware/wifi_cfg @INPUTS@/wifi76/wifi_cfg 0644 0 0
+file /lib/firmware/t5/nv193.bin @INPUTS@/wifi76/nv193.bin 0644 0 0
+file /lib/firmware/t5/nv340.bin @INPUTS@/wifi76/nv340.bin 0644 0 0
+file /lib/firmware/t5/ags2l03-hifi-nv.bin @INPUTS@/ags2l03-hifi-nv.bin 0444 0 0

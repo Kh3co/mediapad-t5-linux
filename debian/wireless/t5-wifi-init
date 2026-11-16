@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+echo Y > /sys/module/dw_mmc_t5/parameters/allow_probe
+for node in plat wifi;do
+ path=/sys/hisys/boot/$node
+ [ -e "$path" ] || exit 1
+ if ! grep -qx running "$path";then echo init >"$path";fi
+ grep -qx running "$path" || { cat "$path";exit 1; }
+done
+test -d /sys/class/net/wlan0

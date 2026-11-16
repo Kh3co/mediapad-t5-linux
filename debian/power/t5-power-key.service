@@ -1,0 +1,15 @@
+[Unit]
+Description=MediaPad T5 short power button
+After=systemd-logind.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -u /usr/local/libexec/t5-power-key listen
+Restart=on-failure
+RestartSec=3
+RuntimeDirectory=t5-power
+RuntimeDirectoryPreserve=yes
+
+[Install]
+WantedBy=multi-user.target

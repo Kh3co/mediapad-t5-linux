@@ -1,0 +1,28 @@
+--- arch/arm64/kernel/setup.c
++++ arch/arm64/kernel/setup.c
+@@ -351,19 +362,25 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
+ 
+ 	if (acpi_disabled)
+ 		unflatten_device_tree();
++	/* debug removed */	/* row 40 magenta = DT unflattened */
+ 
+ 	bootmem_init();
++	/* debug removed */	/* row 50 cyan = bootmem done */
+ 
+ 	kasan_init();
++	/* debug removed */	/* row 60 orange = kasan done */
+ 
+ 	request_standard_resources();
++	/* debug removed */	/* row 70 white = resources done */
+ 
+ 	early_ioremap_reset();
++	/* debug removed */  /* row 80 dark green = ioremap reset done */
+ 
+ 	if (acpi_disabled)
+ 		psci_dt_init();
+ 	else
+ 		psci_acpi_init();
++	/* debug removed */  /* row 90 dark blue = psci done */
+ 
+ 	arm64_rsi_init();
+ 

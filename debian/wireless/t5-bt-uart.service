@@ -1,0 +1,9 @@
+[Unit]
+Description=Hi1102 UART line discipline
+Before=t5-wifi.service
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/libexec/t5-hi1102 uart
+Restart=on-failure
+RestartSec=1
+[Install]
+WantedBy=multi-user.target

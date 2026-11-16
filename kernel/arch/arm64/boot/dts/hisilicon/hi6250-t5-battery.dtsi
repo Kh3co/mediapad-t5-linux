@@ -1,0 +1,35 @@
+/* Read-only battery telemetry. PMIC MFD/charger control remain disabled. */
+&i2c4 {
+    status = "okay";
+    clock-frequency = <100000>;
+    t5_battery_telemetry: battery-telemetry@6b {
+        compatible = "huawei,ags2l03-battery-telemetry";
+        reg = <0x6b>;
+        huawei,pmic = <&pmic>;
+        huawei,ipc = <&mailbox>;
+        mboxes = <&mailbox 16 3 0>;
+        /* Calibration read from this device's existing NV-backed driver. */
+        huawei,calibration = <1002976 6026 1000000 0>;
+        huawei,ntc-table = <4095 3823 3765 3698 3621 3535 3440 3335 3223 3104 2979 2851 2721 2591 2464 2339 2219 2106 1999 1899 1807 1722 1645 1575 1511 1454 1403 1357 1262 1190 1038>;
+    };
+};
+
+/* Original device DT: I2C4 uses GPIO37/38, mux=1, pad bias disabled.
+ * pmx1's inherited node name is misleading, but its actual reg covers
+ * e896c800..e896c8ac and these two pad registers. pmx2 stays disabled.
+ */
+&pmx0 {
+    t5_i2c4_mux: t5-i2c4-mux {
+        pinctrl-single,pins = <0x88 1 0x8c 1>;
+    };
+};
+&pmx1 {
+    pinctrl-single,function-mask = <3>;
+    t5_i2c4_pads: t5-i2c4-pads {
+        pinctrl-single,pins = <0x94 0 0x98 0>;
+    };
+};
+&i2c4 {
+    pinctrl-names = "default";
+    pinctrl-0 = <&t5_i2c4_mux &t5_i2c4_pads>;
+};

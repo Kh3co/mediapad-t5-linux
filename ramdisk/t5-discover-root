@@ -1,0 +1,44 @@
+#!/bin/sh
+# Content selection only. UUIDs, filesystem labels and GPT names are not selectors.
+set -eu
+mkdir -p /run/t5-root /mnt/t5-probe
+: > /run/t5-root/discovery.log
+emmc=
+for path in /sys/class/block/mmcblk[0-9]; do
+ [ -d "$path" ] || continue
+ [ "$(cat "$path/device/type")" = MMC ] || continue
+ real=$(readlink -f "$path/device")
+ case "$real" in */ff390000.sdhci/*) ;; *) continue;; esac
+ [ -z "$emmc" ] || exit 2
+ emmc=${path##*/}
+done
+[ -n "$emmc" ] || exit 2
+[ "$(cat /sys/class/block/$emmc/ro)" = 1 ] || exit 2
+matches=0
+errors=0
+candidate=
+for path in /sys/class/block/${emmc}p*; do
+ [ -r "$path/partition" ] || continue
+ node=/dev/${path##*/}
+ [ "$(cat "$path/ro")" = 1 ] || exit 2
+ if info=$(/opt/t5-ext4-probe "$node"); then
+  if mount -t ext4 -o ro,noload,nodev,nosuid,noexec "$node" /mnt/t5-probe; then
+   if /opt/t5-root-control identity /mnt/t5-probe; then
+    echo "MATCH $node" >> /run/t5-root/discovery.log
+    candidate=$node
+    matches=$((matches+1))
+   else
+    echo "NO_MATCH $node" >> /run/t5-root/discovery.log
+   fi
+   umount /mnt/t5-probe || exit 2
+  else
+   errors=$((errors+1))
+  fi
+ else
+  rc=$?
+  case "$rc" in 1) ;; 2) echo "SKIP_INVALID $node" >> /run/t5-root/discovery.log;; *) errors=$((errors+1));; esac
+ fi
+done
+echo "DISCOVERY matches=$matches errors=$errors" | tee -a /run/t5-root/discovery.log
+[ "$matches" = 1 ] && [ "$errors" = 0 ] || exit 2
+printf '%s\n' "$candidate" > /run/t5-root/device

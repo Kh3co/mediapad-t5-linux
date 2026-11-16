@@ -1,0 +1,12 @@
+// SPDX-License-Identifier: GPL-2.0-only
+#include <dt-bindings/gpio/gpio.h>
+
+/ {
+	t5_power_key: power-key {
+		compatible = "huawei,ags2l03-pmic-power-key";
+		huawei,pmic = <&pmic>;
+		/* Stock PMIC's active-low interrupt output, not the key contact. */
+		interrupt-gpios = <&gpio23 7 GPIO_ACTIVE_LOW>;
+		wakeup-source;
+	};
+};

@@ -1,0 +1,9 @@
+/local-inputs/
+/build/
+/out/
+__pycache__/
+*.img
+*.bin
+
+# Prebuilt upstream selftest fixture
+/kernel/tools/testing/selftests/tc-testing/action-ebpf

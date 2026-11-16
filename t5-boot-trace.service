@@ -1,0 +1,16 @@
+[Unit]
+Description=Save MediaPad T5 boot selector timings
+ConditionPathExists=/proc/device-tree/chosen/t5-loader-handoff
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/t5-boot-trace --save
+LogsDirectory=t5-boot
+LogsDirectoryMode=0750
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,59 @@
+/* FT8201 incell touchscreen. Preserve bootloader LCD/touch power and reset. */
+/ {
+    t5_touch_vcc: regulator-touch-vcc {
+        compatible = "regulator-fixed";
+        regulator-name = "touch-vcc-firmware";
+        regulator-min-microvolt = <3000000>;
+        regulator-max-microvolt = <3000000>;
+        regulator-always-on; regulator-boot-on;
+    };
+    t5_touch_iovcc: regulator-touch-iovcc {
+        compatible = "regulator-fixed";
+        regulator-name = "touch-iovcc-firmware";
+        regulator-min-microvolt = <1800000>;
+        regulator-max-microvolt = <1800000>;
+        regulator-always-on; regulator-boot-on;
+    };
+};
+&{/soc} {
+    t5_touch_aomux: pinctrl-touch@fff11000 {
+        compatible = "pinconf-single";
+        reg = <0 0xfff11000 0 0xac>;
+        #address-cells = <1>; #size-cells = <0>; #pinctrl-cells = <1>;
+        pinctrl-single,register-width = <32>;
+        pinctrl-single,function-mask = <7>;
+        t5_touch_i2c_mux: touch-i2c-mux {
+            pinctrl-single,pins = <0x24 1 0x28 1>;
+        };
+    };
+};
+&pmx3 {
+    status = "okay";
+    pinctrl-single,function-mask = <3>;
+    t5_touch_i2c_pads: touch-i2c-pads {
+        pinctrl-single,pins = <0x2c 0 0x30 0>;
+    };
+    t5_touch_irq_pad: touch-irq-pad {
+        pinctrl-single,pins = <0x58 0>;
+    };
+};
+&i2c2 {
+    status = "okay";
+    clock-frequency = <100000>;
+    pinctrl-names = "default";
+    pinctrl-0 = <&t5_touch_i2c_mux &t5_touch_i2c_pads>;
+    touchscreen@38 {
+        compatible = "focaltech,ft8201";
+        reg = <0x38>;
+        huawei,ags2l03-bootloader-touch;
+        interrupt-parent = <&gpio28>;
+        interrupts = <0 IRQ_TYPE_EDGE_FALLING>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&t5_touch_irq_pad>;
+        vcc-supply = <&t5_touch_vcc>;
+        iovcc-supply = <&t5_touch_iovcc>;
+        touchscreen-size-x = <1200>;
+        touchscreen-size-y = <1920>;
+    };
+};
+

@@ -1,0 +1,11 @@
+[Unit]
+Description=Initialize the MediaPad T5 Hi1102 wireless interface
+After=local-fs.target systemd-udev-trigger.service
+Before=NetworkManager.service
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/t5-wifi-init
+RemainAfterExit=yes
+TimeoutStartSec=90
+[Install]
+WantedBy=multi-user.target

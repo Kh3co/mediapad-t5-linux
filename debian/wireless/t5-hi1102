@@ -1,0 +1,113 @@
+#!/usr/bin/python3
+"""Attach the Huawei line discipline or relay H4 packets to the Linux HCI core."""
+import errno
+import fcntl
+import os
+import select
+import struct
+import sys
+import time
+from pathlib import Path
+
+PS = Path("/sys/hi110x_ps")
+NONBLOCK = os.O_NONBLOCK | os.O_RDWR | os.O_CLOEXEC
+
+
+def uart():
+    fd = None
+    previous = None
+    while True:
+        try:
+            request = tuple(int((PS / name).read_text()) for name in
+                            ("install", "baud_rate", "flow_cntrl"))
+        except FileNotFoundError:
+            time.sleep(.1)
+            continue
+        if request != previous:
+            state, baud, flow = request
+            if state == 0:
+                if fd is not None:
+                    os.close(fd)
+                    fd = None
+            elif state in (1, 2) and 9600 <= baud <= 6000000 and flow in (0, 1):
+                if fd is None:
+                    fd = os.open("/dev/ttyAMA3", NONBLOCK | os.O_NOCTTY)
+                else:
+                    fcntl.ioctl(fd, 0x5423, struct.pack("i", 0))
+                # arm64 termios2, raw 8N1 with exact baud and optional RTS/CTS.
+                attrs = bytearray(44)
+                fcntl.ioctl(fd, 0x802c542a, attrs)
+                struct.pack_into("=4I", attrs, 0, 0, 0, 0x18b0 | (flow << 31), 0)
+                attrs[22:24] = bytes([0, 1])
+                struct.pack_into("=2I", attrs, 36, baud, baud)
+                fcntl.ioctl(fd, 0x402c542b, attrs)
+                fcntl.ioctl(fd, 0x5423, struct.pack("i", 29))
+            else:
+                raise ValueError(request)
+            previous = request
+        time.sleep(.02)
+
+
+def receive(buf, vhci):
+    while buf:
+        kind = buf[0]
+        header = {2: 5, 3: 4, 4: 3, 5: 5}.get(kind)
+        if not header:
+            raise ValueError(f"invalid H4 type {kind}")
+        if len(buf) < header:
+            return
+        size = (int.from_bytes(buf[3:5], "little") if kind in (2, 5) else buf[header-1])
+        if kind == 5:
+            size &= 0x3fff
+        total = header + size
+        if len(buf) < total:
+            return
+        if os.write(vhci, buf[:total]) != total:
+            raise IOError("short HCI receive")
+        del buf[:total]
+
+
+def relay():
+    while not Path("/dev/hwbt").exists():
+        time.sleep(.1)
+    hw = os.open("/dev/hwbt", NONBLOCK)
+    vhci = os.open("/dev/vhci", NONBLOCK)
+    os.write(vhci, bytes([0xff, 4]))
+    poll = select.poll()
+    poll.register(vhci, select.POLLIN)
+    poll.register(hw, select.POLLIN)
+    incoming = bytearray()
+    while True:
+        for fd, events in poll.poll():
+            if fd != vhci and fd != hw:
+                continue
+            if events & (select.POLLERR | select.POLLHUP | select.POLLNVAL):
+                raise IOError(f"transport {fd}: {events:#x}")
+            try:
+                data = os.read(fd, 65536)
+            except BlockingIOError:
+                continue
+            if not data:
+                continue
+            if fd == vhci:
+                if data[:2] == b"\xff\x04":
+                    continue
+                if data == b"\xff\xfe\x00":
+                    if hw is not None:
+                        poll.unregister(hw)
+                        os.close(hw)
+                        hw = None
+                        incoming.clear()
+                    continue
+                if hw is None:
+                    hw = os.open("/dev/hwbt", NONBLOCK)
+                    poll.register(hw, select.POLLIN)
+                if data != b"\xff\xfe\x01" and os.write(hw, data) != len(data):
+                    raise IOError("short HCI transmit")
+            else:
+                incoming.extend(data)
+                receive(incoming, vhci)
+
+
+if __name__ == "__main__":
+    {"uart": uart, "relay": relay}[sys.argv[1]]()

@@ -1,0 +1,10 @@
+[Unit]
+Description=Hi1102 Bluetooth HCI transport
+After=t5-wifi.service t5-bt-uart.service
+Wants=t5-bt-uart.service t5-wifi.service
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/libexec/t5-hi1102 relay
+Restart=on-failure
+RestartSec=2
+[Install]
+WantedBy=multi-user.target

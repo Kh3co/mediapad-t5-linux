@@ -1,0 +1,9 @@
+{
+  "uuid": "t5-sleep-mode@mediapad",
+  "name": "MediaPad T5 睡眠模式",
+  "description": "选择短按电源键时关闭屏幕或进入睡眠。",
+  "shell-version": ["48"],
+  "session-modes": ["user", "unlock-dialog"],
+  "settings-schema": "org.gnome.shell.extensions.t5-sleep-mode",
+  "version": 1
+}

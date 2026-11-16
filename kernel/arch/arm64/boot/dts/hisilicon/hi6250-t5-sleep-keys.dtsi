@@ -1,0 +1,43 @@
+// SPDX-License-Identifier: GPL-2.0-only
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/input/gpio-keys.h>
+
+/* This controller owns the real AO mux at 0xfff11000 on the daily T5 DT. */
+&t5_touch_aomux {
+	t5_volume_mux: volume-key-mux {
+		pinctrl-single,pins = <0x58 0 0x5c 0>;
+	};
+};
+
+&pmx3 {
+	t5_volume_pads: volume-key-pads {
+		/* Pad bits [1:0] = 01: pull-up enabled, pull-down disabled. */
+		pinctrl-single,pins = <0x64 1 0x68 1>;
+	};
+};
+
+/ {
+	volume-keys {
+		compatible = "gpio-keys";
+		label = "MediaPad T5 volume keys";
+		pinctrl-names = "default";
+		pinctrl-0 = <&t5_volume_mux &t5_volume_pads>;
+
+		button-volume-up {
+			label = "Volume Up";
+			linux,code = <KEY_VOLUMEUP>;
+			gpios = <&gpio25 1 GPIO_ACTIVE_LOW>;
+			wakeup-source;
+			wakeup-event-action = <EV_ACT_ASSERTED>;
+		};
+
+		button-volume-down {
+			label = "Volume Down";
+			linux,code = <KEY_VOLUMEDOWN>;
+			gpios = <&gpio25 2 GPIO_ACTIVE_LOW>;
+			wakeup-source;
+			wakeup-event-action = <EV_ACT_ASSERTED>;
+		};
+	};
+};

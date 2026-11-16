@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+parameter=/sys/module/panfrost/parameters/t5_allow_probe
+if [ -w "$parameter" ]; then
+    echo Y > "$parameter"
+    if [ ! -L /sys/bus/platform/devices/e8970000.gpu/driver ]; then
+        echo e8970000.gpu > /sys/bus/platform/drivers/panfrost/bind
+    fi
+fi
